@@ -1,30 +1,28 @@
 "use client";
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import Link from 'next/link';
 import { createPageUrl } from '@/lib/utils';
-import { Calendar, ArrowRight, BookOpen } from 'lucide-react';
+import { Calendar, ArrowRight, BookOpen, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { format, isValid } from 'date-fns';
 import Image from 'next/image';
+import { databases, appwriteConfig } from "@/lib/appwrite";
+import { Query } from "appwrite";
 
 export interface BlogPost {
   id: string;
   title: string;
   excerpt: string;
   cover_image?: string;
-  category: 'news' | 'events' | 'parenting_tips' | 'activities' | 'announcements';
+  category: 'news' | 'events' | 'parenting_tips' | 'activities' | 'announcements' | string;
   is_published: boolean;
   published_date?: string;
   created_date: string;
 }
 
-interface BlogPreviewProps {
-  posts?: BlogPost[];
-}
-
-const categoryColors = {
+const categoryColors: Record<string, string> = {
   news: 'bg-blue-100 text-blue-600',
   events: 'bg-green-100 text-green-600',
   parenting_tips: 'bg-purple-100 text-purple-600',
@@ -32,11 +30,56 @@ const categoryColors = {
   announcements: 'bg-red-100 text-red-600'
 };
 
-export default function BlogPreview({ posts = [] }: BlogPreviewProps) {
-  const displayPosts = posts.filter(p => p.is_published).slice(0, 3);
+export default function BlogPreview() {
+  const [posts, setPosts] = useState<BlogPost[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchRecentPosts = async () => {
+      try {
+        const response = await databases.listDocuments(
+          appwriteConfig.databaseId,
+          appwriteConfig.blogsCollectionId,
+          [
+            Query.equal('is_published', true),
+            Query.orderDesc('$createdAt'),
+            Query.limit(3)
+          ]
+        );
+
+        const formattedPosts = response.documents.map((doc) => ({
+          id: doc.$id,
+          title: doc.title,
+          excerpt: doc.excerpt,
+          cover_image: doc.cover_image,
+          category: doc.category,
+          is_published: doc.is_published,
+          published_date: doc.published_date,
+          created_date: doc.$createdAt, // Appwrite's default creation date
+        }));
+
+        setPosts(formattedPosts as BlogPost[]);
+      } catch (error) {
+        console.error("Error fetching blog preview posts:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchRecentPosts();
+  }, []);
+
+  if (isLoading) {
+    return (
+      <section className="py-20 bg-gray-50 flex flex-col justify-center items-center h-96">
+        <Loader2 className="w-10 h-10 animate-spin text-purple-600 mb-4" />
+        <p className="text-gray-500 font-medium">Loading latest stories...</p>
+      </section>
+    );
+  }
 
   // Fallback if no posts are published yet
-  if (displayPosts.length === 0) {
+  if (posts.length === 0) {
     return null;
   }
 
@@ -62,7 +105,7 @@ export default function BlogPreview({ posts = [] }: BlogPreviewProps) {
         </motion.div>
 
         <div className="grid md:grid-cols-3 gap-8">
-          {displayPosts.map((post, index) => {
+          {posts.map((post, index) => {
             const dateStr = post.published_date || post.created_date;
             const dateObj = new Date(dateStr);
             

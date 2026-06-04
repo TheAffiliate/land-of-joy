@@ -16,6 +16,9 @@ import {
 } from '@/components/ui/select';
 import { toast } from 'sonner';
 
+// --- Appwrite Imports ---
+import { databases, ID, appwriteConfig } from '@/lib/appwrite';
+
 interface ContactItem {
   icon: React.ElementType;
   title: string;
@@ -45,12 +48,32 @@ export default function ContactPage() {
     e.preventDefault();
     setIsSubmitting(true);
     
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    
-    toast.success('Message sent successfully! We\'ll get back to you soon.');
-    setFormData({ name: '', email: '', phone: '', subject: '', message: '' });
-    setIsSubmitting(false);
+    try {
+      // Create document in Appwrite
+      await databases.createDocument(
+        appwriteConfig.databaseId,
+        appwriteConfig.collectionId,
+        ID.unique(),
+        {
+          name: formData.name,
+          email: formData.email,
+          phone: formData.phone || "Not provided",
+          subject: formData.subject,
+          message: formData.message,
+        }
+      );
+
+      toast.success('Message sent! We have safely received your inquiry.');
+      
+      // Reset form on success
+      setFormData({ name: '', email: '', phone: '', subject: '', message: '' });
+      
+    } catch (error) {
+      console.error('Appwrite Error:', error);
+      toast.error('Something went wrong. Please check your connection and try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -173,7 +196,7 @@ export default function ContactPage() {
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="subject">Inquiry Type</Label>
-                    <Select onValueChange={(v: string) => setFormData({...formData, subject: v})}>
+                    <Select onValueChange={(v: string) => setFormData({...formData, subject: v})} value={formData.subject}>
                       <SelectTrigger>
                         <SelectValue placeholder="Select topic" />
                       </SelectTrigger>
@@ -239,9 +262,10 @@ export default function ContactPage() {
                 <h3 className="text-xl font-bold text-gray-900 mb-2">Visit Us</h3>
                 <p className="text-gray-600 mb-6">We invite you to experience our vibrant learning environment firsthand.</p>
                 <div className="flex flex-col sm:flex-row gap-4">
-                    <a 
+                  <a 
                     href="https://www.facebook.com/192120381211327" 
                     target="_blank" 
+                    rel="noopener noreferrer"
                     className="flex items-center justify-center gap-3 bg-blue-600 text-white px-6 py-3 rounded-xl font-bold hover:bg-blue-700 transition-all"
                   >
                     <Facebook className="w-5 h-5" />

@@ -1,6 +1,7 @@
 "use client";
 
 import React from 'react';
+import Link from 'next/link';
 import HeroSection from '@/components/home/HeroSection';
 import ProgramsSection from '@/components/home/ProgramsSection';
 import AboutPreview from '@/components/home/AboutPreview';
@@ -10,6 +11,7 @@ import GalleryPreview from '@/components/home/GalleryPreview';
 import BlogPreview from '@/components/home/BlogPreview';
 import type { BlogPost } from '@/components/home/BlogPreview';
 import ContactCTA from '@/components/home/ContactCTA';
+import { Shield } from 'lucide-react'; // Added icon for the admin button
 
 // Mock Data for UI Development
 const MOCK_UPDATES: Update[] = [
@@ -56,7 +58,7 @@ const MOCK_POSTS: BlogPost[] = [
 
 export default function Home() {
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen relative">
       {/* 1. Hero / Introduction */}
       <HeroSection content={{}} />
       
@@ -77,6 +79,13 @@ export default function Home() {
       
       {/* 7. Final Call to Action & Contact Info */}
       <ContactCTA />
+
+      {/* Admin Access Button (Floating bottom right) */}
+      <Link href="/admin">
+        <div className="fixed bottom-6 right-6 p-3 bg-white/80 backdrop-blur-sm border border-gray-200 rounded-full shadow-lg text-gray-400 hover:text-orange-500 hover:border-orange-500 transition-all z-50 cursor-pointer group">
+          <Shield className="w-5 h-5 group-hover:scale-110 transition-transform" />
+        </div>
+      </Link>
     </div>
   );
 }

@@ -1,17 +1,15 @@
 "use client";
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import { motion } from 'framer-motion';
-import { Calendar, ArrowLeft, Share2, Facebook, Twitter } from 'lucide-react';
+import { Calendar, ArrowLeft, Share2, Facebook, Twitter, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { format } from 'date-fns';
-
-// Defining the params type to fix the 'possibly null' error
-type BlogParams = {
-  id: string;
-};
+import { databases, appwriteConfig } from '@/lib/appwrite';
+import { Query } from 'appwrite';
+import { BlogPost } from '@/types/blog'; // Or define it locally if you prefer
 
 const categoryColors: Record<string, string> = {
   news: 'bg-blue-100 text-blue-600',
@@ -21,55 +19,62 @@ const categoryColors: Record<string, string> = {
   announcements: 'bg-red-100 text-red-600'
 };
 
-// Full Mock Data so ID 1, 2, and 3 all work
-const MOCK_POSTS = [
-  {
-    id: '1',
-    title: "Preparing Your Child for Their First Day",
-    content: `<p>The first day of daycare is a significant milestone for both parents and children. Mark the beginning of a new journey of growth!</p>`,
-    category: "parenting_tips",
-    published_date: new Date().toISOString(),
-    cover_image: "https://images.unsplash.com/photo-1503454537195-1dcabb73ffb9?q=80&w=1200",
-  },
-  {
-    id: '2',
-    title: "Annual Sports Day 2024: What to Expect",
-    content: `<p>Get ready for a day of fun, games, and healthy competition! We have a full schedule of relay races and family events.</p>`,
-    category: "events",
-    published_date: new Date().toISOString(),
-    cover_image: "https://images.unsplash.com/photo-1502086223501-7ea6ecd79368?q=80&w=1200",
-  },
-  {
-    id: '3',
-    title: "New Playground Equipment Has Arrived!",
-    content: `<p>We are thrilled to announce that our new outdoor play area is officially open. Come see the new slides and climbing frames!</p>`,
-    category: "announcements",
-    published_date: new Date().toISOString(),
-    cover_image: "https://images.unsplash.com/photo-1515488042361-ee00e0ddd4e4?q=80&w=1200",
-  }
-];
-
 export default function BlogPostPage() {
-  const params = useParams() as BlogParams;
-  const postId = params?.id;
+  // FIX: Type cast useParams to access 'id' safely
+  const params = useParams();
+  const id = params?.id as string;
 
-  const post = MOCK_POSTS.find(p => p.id === postId);
+  const [post, setPost] = useState<BlogPost | null>(null);
+  const [relatedPosts, setRelatedPosts] = useState<BlogPost[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  // This variable was causing your ESLint error because it wasn't used in the JSX below
-  const relatedPosts = MOCK_POSTS.filter(p => p.category === post?.category && p.id !== post?.id);
+  useEffect(() => {
+    const fetchPostData = async () => {
+      if (!id) return;
+      try {
+        setLoading(true);
+        const currentPost = await databases.getDocument(
+          appwriteConfig.databaseId,
+          appwriteConfig.blogsCollectionId,
+          id
+        ) as BlogPost;
+        
+        setPost(currentPost);
 
-  if (!post) {
-    return (
-      <div className="min-h-screen bg-white py-20 flex items-center justify-center">
-        <div className="text-center">
-          <h1 className="text-2xl font-bold text-gray-900 mb-4">Post not found</h1>
-          <Link href="/blog" className="px-6 py-2 bg-purple-500 text-white rounded-full">
-            Back to Blog
-          </Link>
-        </div>
+        const related = await databases.listDocuments(
+          appwriteConfig.databaseId,
+          appwriteConfig.blogsCollectionId,
+          [
+            Query.equal('category', currentPost.category),
+            Query.notEqual('$id', currentPost.$id),
+            Query.limit(3)
+          ]
+        );
+        setRelatedPosts(related.documents as unknown as BlogPost[]);
+      } catch (error) {
+        console.error("Error fetching post:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchPostData();
+  }, [id]);
+
+  if (loading) return (
+    <div className="min-h-screen flex items-center justify-center">
+      <Loader2 className="w-10 h-10 text-purple-500 animate-spin" />
+    </div>
+  );
+
+  if (!post) return (
+    <div className="min-h-screen bg-white py-20 flex items-center justify-center text-center">
+      <div>
+        <h1 className="text-2xl font-bold text-gray-900 mb-4">Post not found</h1>
+        <Link href="/blog" className="px-6 py-2 bg-purple-500 text-white rounded-full">Back to Blog</Link>
       </div>
-    );
-  }
+    </div>
+  );
 
   return (
     <div className="min-h-screen bg-white">
@@ -85,7 +90,10 @@ export default function BlogPostPage() {
               {post.category.replace('_', ' ')}
             </span>
             <h1 className="text-4xl font-extrabold text-gray-900 mb-6">{post.title}</h1>
-            <div className="flex items-center gap-2 text-gray-500"><Calendar size={16} />{format(new Date(post.published_date), 'MMMM d, yyyy')}</div>
+            <div className="flex items-center gap-2 text-gray-500">
+              <Calendar size={16} />
+              {format(new Date(post.$createdAt), 'MMMM d, yyyy')}
+            </div>
           </motion.div>
         </div>
       </section>
@@ -93,13 +101,17 @@ export default function BlogPostPage() {
       {/* Hero Image */}
       <div className="max-w-5xl mx-auto px-4 -mt-10">
         <div className="relative h-72 sm:h-120 rounded-3xl overflow-hidden shadow-2xl border-4 border-white">
-          <Image src={post.cover_image} alt={post.title} fill className="object-cover" priority />
+          <Image src={post.cover_image || "/placeholder-blog.jpg"} alt={post.title} fill className="object-cover" priority />
         </div>
       </div>
 
       {/* Article Content */}
       <section className="py-16 max-w-3xl mx-auto px-4">
-        <div className="prose prose-lg prose-purple max-w-none text-gray-700" dangerouslySetInnerHTML={{ __html: post.content }} />
+        {/* Important: Ensure your Admin page saves HTML from the ReactQuill editor for this to work */}
+        <div 
+          className="prose prose-lg prose-purple max-w-none text-gray-700" 
+          dangerouslySetInnerHTML={{ __html: post.content }} 
+        />
         
         <div className="mt-16 pt-8 border-t flex justify-between items-center">
           <span className="font-bold text-gray-900">Share:</span>
@@ -111,16 +123,20 @@ export default function BlogPostPage() {
         </div>
       </section>
 
-      {/* RELATED POSTS SECTION - Using the variable here fixes the ESLint error */}
+      {/* Related Posts */}
       {relatedPosts.length > 0 && (
         <section className="py-16 bg-gray-50">
           <div className="max-w-7xl mx-auto px-4">
             <h2 className="text-2xl font-bold mb-8 text-center">More from {post.category.replace('_', ' ')}</h2>
             <div className="grid md:grid-cols-3 gap-8">
               {relatedPosts.map((related) => (
-                <Link key={related.id} href={`/blog/${related.id}`} className="bg-white rounded-2xl overflow-hidden shadow-md hover:shadow-xl transition-all group">
-                  <div className="relative h-48"><Image src={related.cover_image} alt={related.title} fill className="object-cover group-hover:scale-105 transition-transform" /></div>
-                  <div className="p-6"><h3 className="font-bold group-hover:text-purple-600">{related.title}</h3></div>
+                <Link key={related.$id} href={`/blog/${related.$id}`} className="bg-white rounded-2xl overflow-hidden shadow-md hover:shadow-xl transition-all group">
+                  <div className="relative h-48">
+                    <Image src={related.cover_image || "/placeholder-blog.jpg"} alt={related.title} fill className="object-cover group-hover:scale-105 transition-transform" />
+                  </div>
+                  <div className="p-6">
+                    <h3 className="font-bold group-hover:text-purple-600 line-clamp-2">{related.title}</h3>
+                  </div>
                 </Link>
               ))}
             </div>
