@@ -1,6 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // Preserve your existing image configurations
   images: {
     remotePatterns: [
       {
@@ -13,6 +14,12 @@ const nextConfig: NextConfig = {
       },
     ],
   },
+  
+  // Appwrite Build Memory Optimizations
+  productionBrowserSourceMaps: false,
+  experimental: {
+    webpackBuildWorker: true,
+  }
 };
 
 export default nextConfig;
