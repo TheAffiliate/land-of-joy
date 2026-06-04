@@ -12,13 +12,14 @@ export const storage = new Storage(client);
 export { ID }; 
 
 export const appwriteConfig = {
-    databaseId: process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID as string,
-    // Ensure this matches the variable name in your .env.local
-    collectionId: process.env.NEXT_PUBLIC_APPWRITE_INQUIRIES_COLLECTION_ID as string, 
-    blogsCollectionId: process.env.NEXT_PUBLIC_APPWRITE_BLOGS_COLLECTION_ID as string,
-    galleryCollectionId: process.env.NEXT_PUBLIC_APPWRITE_GALLERY_COLLECTION_ID as string,
-    updatesCollectionId: process.env.NEXT_PUBLIC_APPWRITE_UPDATES_COLLECTION_ID as string,
-    storageBucketId: process.env.NEXT_PUBLIC_APPWRITE_STORAGE_BUCKET_ID as string,
+  endpoint: process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT || '',
+  projectId: process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID || '',
+  databaseId: process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID || '',
+  collectionId: process.env.NEXT_PUBLIC_APPWRITE_INQUIRIES_COLLECTION_ID || '',
+  blogsCollectionId: process.env.NEXT_PUBLIC_APPWRITE_BLOGS_COLLECTION_ID || '',
+  galleryCollectionId: process.env.NEXT_PUBLIC_APPWRITE_GALLERY_COLLECTION_ID || '',
+  updatesCollectionId: process.env.NEXT_PUBLIC_APPWRITE_UPDATES_COLLECTION_ID || '', // ← Ensure this line is present
+  storageBucketId: process.env.NEXT_PUBLIC_APPWRITE_STORAGE_BUCKET_ID || '',
 };
 
 export default client;

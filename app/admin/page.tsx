@@ -6,7 +6,7 @@ import { Query, ID, Models } from "appwrite";
 import { toast } from "sonner";
 import { 
   Loader2, Lock, LogOut, Trash2, Mail, 
-  Plus, ImageIcon, FileText, ShieldCheck, Grid
+  Plus, ImageIcon, FileText, ShieldCheck, Grid, Bell
 } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Input } from '@/components/ui/input';
@@ -27,7 +27,15 @@ interface GalleryItem extends Models.Document {
     category: string;
 }
 
-type TabType = 'blogs' | 'gallery' | 'inquiries' | 'settings';
+interface UpdateItem extends Models.Document {
+    title: string;
+    content: string;
+    type: 'announcement' | 'event';
+    priority: 'high' | 'medium' | 'low';
+    is_active: boolean;
+}
+
+type TabType = 'blogs' | 'gallery' | 'updates' | 'inquiries' | 'settings';
 
 const GALLERY_CATEGORIES = [
     "graduation", "daily_activities", "events", "outdoor_play", "classroom", "sports_day", "cultural_day"
@@ -43,6 +51,7 @@ export default function AdminDashboardPage() {
     const [inquiries, setInquiries] = useState<Inquiry[]>([]);
     const [blogs, setBlogs] = useState<BlogPost[]>([]);
     const [gallery, setGallery] = useState<GalleryItem[]>([]);
+    const [updates, setUpdates] = useState<UpdateItem[]>([]);
     
     // --- Form States ---
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -54,6 +63,14 @@ export default function AdminDashboardPage() {
 
     const [galleryForm, setGalleryForm] = useState({
         image_url: '', category: 'daily_activities'
+    });
+
+    const [updateForm, setUpdateForm] = useState({
+        title: '',
+        content: '',
+        type: 'announcement' as 'announcement' | 'event',
+        priority: 'medium' as 'high' | 'medium' | 'low',
+        is_active: true
     });
 
     const [email, setEmail] = useState("");
@@ -73,6 +90,10 @@ export default function AdminDashboardPage() {
             // Fetch Gallery
             const galleryRes = await databases.listDocuments(appwriteConfig.databaseId, appwriteConfig.galleryCollectionId, [Query.orderDesc("$createdAt")]);
             setGallery(galleryRes.documents as unknown as GalleryItem[]);
+
+            // Fetch Updates
+            const updateRes = await databases.listDocuments(appwriteConfig.databaseId, appwriteConfig.updatesCollectionId, [Query.orderDesc("$createdAt")]);
+            setUpdates(updateRes.documents as unknown as UpdateItem[]);
         } catch (error) {
             console.error("Data fetch error:", error);
         }
@@ -137,6 +158,38 @@ export default function AdminDashboardPage() {
             await databases.deleteDocument(appwriteConfig.databaseId, appwriteConfig.galleryCollectionId, id);
             setGallery(gallery.filter(item => item.$id !== id));
             toast.success("Image removed");
+        } catch {
+            toast.error("Delete failed");
+        }
+    };
+
+    const handleCreateUpdate = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setIsSubmitting(true);
+        try {
+            const newUpdate = await databases.createDocument(
+                appwriteConfig.databaseId,
+                appwriteConfig.updatesCollectionId,
+                ID.unique(),
+                updateForm
+            );
+            setUpdates([newUpdate as unknown as UpdateItem, ...updates]);
+            setUpdateForm({ title: '', content: '', type: 'announcement', priority: 'medium', is_active: true });
+            setShowNewForm(false);
+            toast.success("Notice published successfully!");
+        } catch {
+            toast.error("Failed to create alert notice.");
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+
+    const deleteUpdate = async (id: string) => {
+        if (!confirm("Delete this notice update?")) return;
+        try {
+            await databases.deleteDocument(appwriteConfig.databaseId, appwriteConfig.updatesCollectionId, id);
+            setUpdates(updates.filter(item => item.$id !== id));
+            toast.success("Notice removed");
         } catch {
             toast.error("Delete failed");
         }
@@ -242,17 +295,18 @@ export default function AdminDashboardPage() {
             </header>
 
             <main className="max-w-5xl mx-auto px-6 -mt-10 pb-20">
-                <nav className="flex gap-2 mb-10 bg-white p-1.5 rounded-full shadow-lg border border-gray-100 w-fit">
+                <nav className="flex gap-2 mb-10 bg-white p-1.5 rounded-full shadow-lg border border-gray-100 w-fit overflow-x-auto max-w-full">
                     {[
                         { id: 'blogs', label: `Blogs (${blogs.length})`, icon: <FileText className="w-4 h-4" /> },
                         { id: 'gallery', label: `Gallery (${gallery.length})`, icon: <Grid className="w-4 h-4" /> },
+                        { id: 'updates', label: `Updates (${updates.length})`, icon: <Bell className="w-4 h-4" /> },
                         { id: 'inquiries', label: `Inquiries (${inquiries.length})`, icon: <Mail className="w-4 h-4" /> },
                         { id: 'settings', label: 'Settings', icon: <ShieldCheck className="w-4 h-4" /> },
                     ].map((tab) => (
                         <button
                             key={tab.id}
                             onClick={() => {setActiveTab(tab.id as TabType); setShowNewForm(false);}}
-                            className={`flex items-center gap-2 px-6 py-2 rounded-full transition-all text-sm font-semibold ${
+                            className={`flex items-center gap-2 px-6 py-2 rounded-full transition-all text-sm font-semibold whitespace-nowrap ${
                                 activeTab === tab.id ? 'bg-orange-500 text-white shadow-md' : 'text-gray-500 hover:bg-gray-50'
                             }`}
                         >
@@ -369,6 +423,88 @@ export default function AdminDashboardPage() {
                                     </div>
                                 </div>
                             ))}
+                        </div>
+                    </div>
+                )}
+
+                {activeTab === 'updates' && (
+                    <div>
+                        <div className="flex justify-between items-center mb-6">
+                            <h2 className="text-2xl font-bold text-gray-800">Latest Updates & Notices</h2>
+                            <Button onClick={() => setShowNewForm(!showNewForm)} className="bg-orange-500 rounded-full px-6">
+                                {showNewForm ? "Cancel" : <><Plus className="w-4 h-4 mr-2" /> New Notice</>}
+                            </Button>
+                        </div>
+
+                        {showNewForm && (
+                            <div className="bg-white p-8 rounded-2xl shadow-sm border mb-8 animate-in zoom-in-95">
+                                <form onSubmit={handleCreateUpdate} className="grid md:grid-cols-2 gap-6">
+                                    <div className="space-y-4">
+                                        <div>
+                                            <Label>Notice Title</Label>
+                                            <Input value={updateForm.title} onChange={e => setUpdateForm({...updateForm, title: e.target.value})} placeholder="e.g. School Reopening" required />
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div>
+                                                <Label>Type</Label>
+                                                <select className="w-full border rounded-md p-2 text-sm mt-1" value={updateForm.type} onChange={e => setUpdateForm({...updateForm, type: e.target.value as 'announcement' | 'event'})}>
+                                                    <option value="announcement">Announcement</option>
+                                                    <option value="event">Event</option>
+                                                </select>
+                                            </div>
+                                            <div>
+                                                <Label>Priority</Label>
+                                                <select className="w-full border rounded-md p-2 text-sm mt-1" value={updateForm.priority} onChange={e => setUpdateForm({...updateForm, priority: e.target.value as 'high' | 'medium' | 'low'})}>
+                                                    <option value="low">Low</option>
+                                                    <option value="medium">Medium</option>
+                                                    <option value="high">High</option>
+                                                </select>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div className="space-y-4">
+                                        <div>
+                                            <Label>Content Details</Label>
+                                            <textarea className="w-full border rounded-md p-2 text-sm h-24 mt-1" value={updateForm.content} onChange={e => setUpdateForm({...updateForm, content: e.target.value})} placeholder="Write notice content here..." required />
+                                        </div>
+                                        <Button type="submit" className="w-full bg-orange-500 h-11" disabled={isSubmitting}>
+                                            {isSubmitting ? "Publishing..." : "Publish Notice"}
+                                        </Button>
+                                    </div>
+                                </form>
+                            </div>
+                        )}
+
+                        <div className="space-y-4">
+                            {updates.map((item) => (
+                                <div key={item.$id} className="bg-white rounded-2xl border p-5 shadow-sm flex items-start justify-between gap-4">
+                                    <div className="space-y-2">
+                                        <div className="flex flex-wrap items-center gap-2">
+                                            <h3 className="font-bold text-lg text-gray-800">{item.title}</h3>
+                                            <span className={`text-[10px] uppercase font-bold px-2.5 py-0.5 rounded-full ${
+                                                item.type === 'event' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'
+                                            }`}>
+                                                {item.type}
+                                            </span>
+                                            <span className={`text-[10px] uppercase font-bold px-2.5 py-0.5 rounded-full ${
+                                                item.priority === 'high' ? 'bg-red-100 text-red-700' : item.priority === 'medium' ? 'bg-amber-100 text-amber-700' : 'bg-gray-100 text-gray-600'
+                                            }`}>
+                                                {item.priority} priority
+                                            </span>
+                                        </div>
+                                        <p className="text-gray-600 text-sm leading-relaxed">{item.content}</p>
+                                    </div>
+                                    <Button variant="ghost" onClick={() => deleteUpdate(item.$id)} className="text-gray-400 hover:text-red-500 shrink-0">
+                                        <Trash2 className="w-4 h-4" />
+                                    </Button>
+                                </div>
+                            ))}
+                            {updates.length === 0 && (
+                                <div className="text-center py-12 text-gray-400 bg-white border rounded-2xl">
+                                    <Bell className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                                    <p>No notices published yet.</p>
+                                </div>
+                            )}
                         </div>
                     </div>
                 )}
